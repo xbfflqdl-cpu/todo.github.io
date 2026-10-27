@@ -912,19 +912,19 @@ function renderUser(){
     <div class="stat"><b data-count="${streakDays()}">0</b><span>연속 일수</span></div>
     <div class="stat"><b data-count="${S.routines.length}">0</b><span>루틴</span></div>
   </div>
-  ${storageCardHTML()}
   <div class="sec">이번 주</div>
   <div class="card chart">
     <div class="rate"><b data-count="${rate}" data-suf="%">0%</b><span>최근 7일 달성률</span></div>
     <div class="bars">${days.map((d,i)=>`<div class="bcol${d.k===t?' today':''}" aria-label="${labelFor(d.k)} ${d.done}/${d.total}"><div class="btrack"><i class="bar2" style="--p:${d.total?Math.max(6,Math.round(d.done/d.total*100)):0};--d:${i*.06}s"></i></div><span class="blab">${DN[dow(d.k)]}</span></div>`).join('')}</div>
   </div>
   ${crates.length?`<div class="sec">카테고리별</div><div class="card crate">${crates.map(c=>`<div class="cr"><div>${esc(c.name)}<span>${c.b}/${c.a} · ${c.p}%</span></div><div class="ctrack" style="display:block;margin:0"><i data-w="${c.p}"></i></div></div>`).join('')}</div>`:''}
+  ${storageCardHTML()}
   <div class="sec">데이터</div>
   <div class="group">
     <button class="row" data-a="export"><span>백업 내보내기<br><small>JSON 파일로 저장해요</small></span>${ic('chev',18,2)}</button>
     <button class="row" data-a="import"><span>백업 불러오기<br><small>현재 데이터를 덮어써요</small></span>${ic('chev',18,2)}</button>
   </div>
-  <div class="ver">투두 개인용 v1.3 · 로그인 없이 이 기기에만 저장해요</div>`;
+  <div class="ver">투두 개인용 v1.3.1 · 로그인 없이 이 기기에만 저장해요</div>`;
   void sc.offsetWidth;
   requestAnimationFrame(()=>{sc.classList.add('in');
     $$('[data-w]',sc).forEach(i=>i.style.width=i.dataset.w+'%');
