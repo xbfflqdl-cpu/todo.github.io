@@ -5,7 +5,7 @@ const text=(v,max)=>typeof v==='string'&&v.length<=max;
 const id=v=>text(v,100)&&/^[a-zA-Z0-9_-]+$/.test(v);
 const date=v=>text(v,10)&&/^\d{4}-\d{2}-\d{2}$/.test(v)&&!isNaN(Date.parse(v));
 const time=v=>v===''||typeof v==='string'&&/^([01]\d|2[0-3]):[0-5]\d$/.test(v);
-function validate(d){
+function validate(d,enforceLimit=true){
   const bad=()=>{throw Error('데이터 형식이 맞지 않아요. 원래 앱에서 내보낸 백업을 사용해 주세요.')};
   if(!d||!text(d.nick,12)||!date(d.joined)||!Array.isArray(d.cats)||!d.cats.length||!Array.isArray(d.tasks)||!Array.isArray(d.routines??[]))bad();
   if(!text(d.photo||'',100000)||d.photo&&!/^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(d.photo))bad();
@@ -24,13 +24,36 @@ function validate(d){
   const result={nick:d.nick,photo:d.photo||'',joined:d.joined,settings:{hideDone:!!d.settings?.hideDone},
     cats:d.cats.map(c=>({id:c.id,name:c.name,collapsed:!!c.collapsed})),
     tasks:d.tasks.map(t=>({id:t.id,title:t.title,date:t.date,done:t.done,cat:t.cat,time:t.time||'',note:t.note||'',...(t.rid?{rid:t.rid}:{})})),
-    routines:(d.routines||[]).map(r=>({id:r.id,title:r.title,cat:r.cat,type:r.type,start:r.start,days:r.days||[],n:r.n||2,day:r.day||1,time:r.time||'',note:r.note||'',skips:r.skips||[]}))};
-  if(encoder.encode(JSON.stringify(result)).length>4000000)throw Error('저장 용량에 가까워졌어요. 백업을 내보내고 오래된 할 일을 정리해 주세요.');
+    routines:(d.routines||[]).map(r=>({id:r.id,title:r.title,cat:r.cat,type:r.type,start:r.start,days:[...(r.days||[])],n:r.n||2,day:r.day||1,time:r.time||'',note:r.note||'',skips:[...(r.skips||[])]}))};
+  if(enforceLimit&&encoder.encode(JSON.stringify(result)).length>4000000)throw Error('저장 용량에 가까워졌어요. 백업을 내보내고 오래된 할 일을 정리해 주세요.');
   return result;
 }
 
+const STORAGE_LIMIT=4000000;
+function storageInfo(data){
+  const used=encoder.encode(JSON.stringify(validate(data,false))).length;
+  return {used,limit:STORAGE_LIMIT,remaining:Math.max(0,STORAGE_LIMIT-used),percent:used/STORAGE_LIMIT*100};
+}
+function planCleanup(data,before=null){
+  if(before!==null&&!date(before))throw Error('정리할 기간을 확인해 주세요.');
+  // validate returns a separate copy: previewing or a failed save never mutates
+  // the active data. Include routine exceptions in the exact space estimate.
+  const next=validate(data,false),initial=storageInfo(next).used;
+  const removed=next.tasks.filter(task=>task.done&&(before===null||task.date<before));
+  const removeIds=new Set(removed.map(task=>task.id));
+  const routines=new Map(next.routines.map(routine=>[routine.id,routine]));
+  for(const task of removed){
+    const routine=routines.get(task.rid);
+    if(routine&&!routine.skips.includes(task.date))routine.skips.push(task.date);
+  }
+  // A removed completed routine occurrence must not reappear as unfinished.
+  next.tasks=next.tasks.filter(task=>!removeIds.has(task.id));
+  const after=storageInfo(next).used;
+  return {data:next,count:removed.length,before:initial,after,freed:Math.max(0,initial-after)};
+}
+
 const KEY='todo.personal.local.v1';
-let hooks,raw=null;
+let hooks,raw=null,lastSaveOk=true;
 function status(text){hooks.onStatus(text)}
 function start(options){
   hooks=options;
@@ -51,8 +74,8 @@ function start(options){
   }catch(e){hooks.onError(raw!==null?'저장 데이터를 열지 못했어요. 원본 내려받기로 먼저 보관해 주세요.':'이 환경에서는 저장할 수 없어요. 일반 Safari 창에서 다시 열어 주세요.')}
 }
 function save(data){
-  try{const clean=validate(data);localStorage.setItem(KEY,JSON.stringify(clean));status('이 기기에 저장됨 · 백업은 사용자 탭에서')}
-  catch(e){status('저장 실패 · 백업을 꼭 내보내 주세요');hooks.onError('저장에 실패했어요. 사용자 탭에서 백업을 내보내고 저장 공간을 확인해 주세요.')}
+  try{const clean=validate(data);localStorage.setItem(KEY,JSON.stringify(clean));lastSaveOk=true;status('이 기기에 저장됨 · 백업은 사용자 탭에서');return true}
+  catch(e){lastSaveOk=false;status('저장 실패 · 백업을 꼭 내보내 주세요');hooks.onError('저장에 실패했어요. 사용자 탭에서 백업을 내보내고 저장 공간을 확인해 주세요.');return false}
 }
-return {start,save,validate,get raw(){return raw}};
+return {start,save,validate,storageInfo,planCleanup,get lastSaveOk(){return lastSaveOk},get raw(){return raw}};
 })();

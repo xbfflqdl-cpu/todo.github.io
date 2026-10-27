@@ -317,6 +317,25 @@ button.srow:active{background:var(--chip)}
 /* Keep editable text at least 16px to avoid iPhone focus zoom. */
 input,textarea,.field input,.addrow input,input.inp,textarea.inp,input.cin{font-size:max(16px,var(--t16))}
 input.nick{font-size:max(16px,var(--t20))}
+.storage-card{padding:20px;margin-top:22px}
+.storage-head{display:flex;align-items:center;justify-content:space-between;font-size:var(--t15);font-weight:700;gap:12px}
+.storage-head b{font-size:var(--t18)}
+.storage-track{height:8px;border-radius:99px;background:var(--chip);overflow:hidden;margin:16px 0}
+.storage-track i{display:block;height:100%;border-radius:inherit;background:var(--ink)}
+.storage-card.warn .storage-track i{background:#9b6500}.storage-card.full .storage-track i{background:var(--danger)}
+.storage-values{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.storage-values small,.cleanup-preview small{display:block;color:var(--sub);font-size:var(--t12);margin-bottom:2px}
+.storage-values b{font-size:var(--t18)}
+.storage-note{font-size:var(--t12);line-height:1.6;color:var(--sub);margin:12px 0 0;overflow-wrap:anywhere}
+.storage-card .row{padding:14px 0 0;margin-top:14px;border-top:1px solid var(--hair);min-height:44px;gap:12px}
+.storage-alert{font-size:var(--t13);line-height:1.6;color:var(--danger);margin:12px 0 0}
+.cleanup-preview{background:var(--bg);border:1px solid var(--hair);border-radius:20px;padding:18px;margin:18px 0;display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.cleanup-preview b{display:block;font-size:var(--t18)}
+.cleanup-actions{display:grid;gap:10px;margin-top:20px}
+.cleanup-actions button{width:100%;height:auto;min-height:48px;padding:12px 16px;border-radius:16px;white-space:normal}
+.cleanup-actions button:disabled{opacity:.4;cursor:default}
+.cleanup-summary{font-size:var(--t14);line-height:1.6;color:var(--sub);margin:14px 0 0}
+
 </style>
 </head>
 <body>
@@ -815,6 +834,62 @@ function routineEditView(r){
   return el}
 
 /* ---------- 사용자 탭 ---------- */
+function formatBytes(bytes){
+  if(bytes<1000)return Math.round(bytes)+' B';
+  if(bytes<1000000)return (bytes/1000).toLocaleString('ko-KR',{maximumFractionDigits:1})+' KB';
+  return (bytes/1000000).toLocaleString('ko-KR',{maximumFractionDigits:2})+' MB';
+}
+function storageCardHTML(){
+  const info=cloud.storageInfo(S),percent=info.percent;
+  const done=S.tasks.filter(task=>task.done).length;
+  return `<div id="storageCard" class="card storage-card${percent>=95?' full':percent>=80?' warn':''}">
+    <div class="storage-head"><span>앱 저장 공간</span><b>${percent.toFixed(1)}%</b></div>
+    <div class="storage-track" role="meter" aria-label="앱 데이터 사용량" aria-valuemin="0" aria-valuemax="${info.limit}" aria-valuenow="${Math.min(info.used,info.limit)}" aria-valuetext="${formatBytes(info.used)} 사용, ${formatBytes(info.remaining)} 남음"><i style="width:${Math.min(100,percent)}%"></i></div>
+    <div class="storage-values"><div><small>사용 중</small><b>${formatBytes(info.used)}</b></div><div><small>남은 용량</small><b>${formatBytes(info.remaining)}</b></div></div>
+    <p class="storage-note">앱 한도 4 MB 기준 · 저장된 할 일 ${S.tasks.length.toLocaleString('ko-KR')}개<br>아이폰 전체 여유 공간과는 달라요. 브라우저 저장 공간 사정에 따라 더 일찍 저장이 제한될 수 있어요.</p>
+    ${!cloud.lastSaveOk?'<p class="storage-alert">저장하지 못한 변경이 있어요. 앱을 닫기 전에 백업을 내보내 주세요.</p>':percent>=80?'<p class="storage-alert">저장 공간이 줄고 있어요. 백업 후 오래된 완료 기록을 정리해 주세요.</p>':''}
+    <button class="row" data-a="cleanup"><span>완료 기록 정리<br><small>완료 ${done.toLocaleString('ko-KR')}개 · 삭제 전 용량 확인</small></span>${ic('chev',18,2)}</button>
+  </div>`;
+}
+function refreshStorageCard(){
+  const card=$('#storageCard');if(card&&S)card.replaceWith(h(storageCardHTML()));
+}
+function cleanupView(){
+  let range='30',currentPlan=null,busy=false;
+  const el=h(`<div>${head('완료 기록 정리')}
+    <p class="cleanup-summary">백업 파일을 먼저 보관한 뒤, 필요 없는 완료 기록을 정리하세요.</p>
+    ${chipsHTML([{v:'30',t:'30일 이전'},{v:'90',t:'90일 이전'},{v:'all',t:'완료 전체'}],range,'cleanup-range')}
+    <div id="cleanup-preview"></div>
+    <p class="storage-note">미완료 할 일, 카테고리, 프로필과 루틴 설정은 유지돼요. 정리한 완료 기록은 통계에서도 빠져요. 삭제한 루틴 기록이 미완료로 다시 나타나지는 않아요.</p>
+    <div class="cleanup-actions"><button class="ghost" id="cleanup-backup">전체 백업 내보내기</button><button class="primary dng" id="cleanup-delete">완료 기록 삭제</button></div>
+  </div>`);
+  function preview(){
+    const cutoff=range==='all'?null:addDays(todayKey(),-Number(range));
+    currentPlan=cloud.planCleanup(S,cutoff);
+    const p=currentPlan;
+    $('#cleanup-preview',el).innerHTML=`<div class="cleanup-preview"><div><small>삭제할 완료 기록</small><b>${p.count.toLocaleString('ko-KR')}개</b></div><div><small>확보할 용량</small><b>${formatBytes(p.freed)}</b></div><div><small>정리 후 사용량</small><b>${formatBytes(p.after)}</b></div><div><small>정리 후 남는 용량</small><b>${formatBytes(Math.max(0,cloud.storageInfo(S).limit-p.after))}</b></div></div>
+      <p class="storage-note">${cutoff?`${esc(cutoff)}보다 이전 날짜의 완료 기록만 정리해요.`:'날짜와 관계없이 저장된 완료 기록을 모두 정리해요.'}${p.count?'':' 해당하는 기록이 없어요.'}</p>`;
+    $('#cleanup-delete',el).disabled=!p.count||busy;
+  }
+  bindChips($('#cleanup-range',el),value=>{if(busy)return;range=value;preview()});
+  $('#cleanup-backup',el).onclick=()=>exportData();
+  $('#cleanup-delete',el).onclick=async()=>{
+    if(busy)return;preview();if(!currentPlan.count)return;
+    busy=true;$('#cleanup-delete',el).disabled=true;
+    const fingerprint=JSON.stringify(S),cutoff=range==='all'?null:addDays(todayKey(),-Number(range));
+    try{
+      if(!await ask({title:`완료 기록 ${currentPlan.count.toLocaleString('ko-KR')}개 삭제`,desc:`약 ${formatBytes(currentPlan.freed)}를 확보해요. 삭제한 기록은 통계에서도 빠지며, 되돌리려면 삭제 전 백업이 필요해요. 백업 파일을 보관했는지 확인해 주세요.`,ok:'삭제',danger:true}))return;
+      if(JSON.stringify(S)!==fingerprint){toast('기록이 변경됐어요. 정리 대상을 다시 확인해 주세요.');return}
+      const plan=cloud.planCleanup(S,cutoff);
+      // Commit storage first. A quota failure leaves the active records intact.
+      if(!cloud.save(plan.data))return;
+      S=plan.data;sheet.close();renderAvatars();renderHeader();renderCal(null,true);renderList();renderUser();
+      toast(`완료 기록 ${plan.count.toLocaleString('ko-KR')}개를 정리했어요`);
+    }finally{busy=false;if(el.isConnected)preview()}
+  };
+  preview();return el;
+}
+
 function streakDays(){
   const set=new Set(S.tasks.filter(t=>t.done).map(t=>t.date));let k=todayKey(),n=0;
   if(!set.has(k))k=addDays(k,-1);
@@ -837,6 +912,7 @@ function renderUser(){
     <div class="stat"><b data-count="${streakDays()}">0</b><span>연속 일수</span></div>
     <div class="stat"><b data-count="${S.routines.length}">0</b><span>루틴</span></div>
   </div>
+  ${storageCardHTML()}
   <div class="sec">이번 주</div>
   <div class="card chart">
     <div class="rate"><b data-count="${rate}" data-suf="%">0%</b><span>최근 7일 달성률</span></div>
@@ -848,7 +924,7 @@ function renderUser(){
     <button class="row" data-a="export"><span>백업 내보내기<br><small>JSON 파일로 저장해요</small></span>${ic('chev',18,2)}</button>
     <button class="row" data-a="import"><span>백업 불러오기<br><small>현재 데이터를 덮어써요</small></span>${ic('chev',18,2)}</button>
   </div>
-  <div class="ver">투두 개인용 v1.2 · 로그인 없이 이 기기에만 저장해요</div>`;
+  <div class="ver">투두 개인용 v1.3 · 로그인 없이 이 기기에만 저장해요</div>`;
   void sc.offsetWidth;
   requestAnimationFrame(()=>{sc.classList.add('in');
     $$('[data-w]',sc).forEach(i=>i.style.width=i.dataset.w+'%');
@@ -866,6 +942,7 @@ function countUp(el,to,suf){
     const a=e.target.closest('[data-a]');if(!a)return;
     switch(a.dataset.a){
       case 'export':exportData();break;
+      case 'cleanup':sheet.open(cleanupView);break;
       case 'import':$('#fileJson').click();break;
     }
   });
@@ -880,14 +957,13 @@ $('#fileImg').addEventListener('change',e=>{
   img.onerror=()=>{URL.revokeObjectURL(url);toast('이미지를 열 수 없어요')};img.src=url});
 function exportData(){
   const blob=new Blob([JSON.stringify({app:'todo-demo',v:1,exported:new Date().toISOString(),data:S},null,2)],{type:'application/json'});
-  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`todo-backup-${todayKey()}.json`;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),1000);toast('백업 파일을 저장했어요')}
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`todo-backup-${todayKey()}-${new Date().toTimeString().slice(0,8).replace(/:/g,'')}-${new Date().getMilliseconds()}.json`;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),1000);toast('백업 파일 다운로드를 요청했어요')}
 $('#fileJson').addEventListener('change',async e=>{
   const f=e.target.files[0];e.target.value='';if(!f)return;
-  try{if(f.size>800000)throw Error('백업 크기 초과');const j=JSON.parse(await f.text()),d=cloud.validate(j.data||j);
+  try{if(f.size>16000000)throw Error('백업 크기 초과');const j=JSON.parse(await f.text()),d=cloud.validate(j.data||j);
     if(!Array.isArray(d.cats)||!Array.isArray(d.tasks))throw 0;
     if(!await ask({title:'백업 불러오기',desc:`할 일 ${d.tasks.length}개, 카테고리 ${d.cats.length}개를 불러와요. 현재 데이터는 사라져요.`,ok:'불러오기'}))return;
-    S=d;
-    save();renderAvatars();renderList();renderCal(null,true);renderHeader();renderUser();toast('불러왔어요')}
+    if(!cloud.save(d))return;S=d;renderAvatars();renderList();renderCal(null,true);renderHeader();renderUser();toast('불러왔어요')}
   catch(err){toast('올바른 백업 파일이 아니에요')}});
 /* ---------- 시작 ---------- */
 function buildHome(){
@@ -897,7 +973,7 @@ window.addEventListener('error',e=>{const a=$('#authErr');if(a&&!$('#auth').hidd
 (function boot(){
   cloud.start({defaults:defaultData,
     onData:(id,data)=>{if(U===id){S=data;renderAvatars();renderHeader();renderCal(null,true);renderList();if(ui.tab==='user')renderUser()}else enterApp(id,data)},
-    onStatus:msg=>{$('#syncStatus').textContent=msg},
+    onStatus:msg=>{$('#syncStatus').textContent=msg;if(U&&ui.tab==='user')refreshStorageCard()},
     onError:msg=>{
       if(!U){$('#auth').hidden=false;$('#authErr').textContent=msg}
       else toast(msg)
