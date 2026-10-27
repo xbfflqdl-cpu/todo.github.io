@@ -314,7 +314,9 @@ button.srow:active{background:var(--chip)}
 @media(display-mode:standalone){.phone{width:100%;height:100dvh;border-radius:0;box-shadow:none}}
 .sync{font-size:12px;color:var(--sub);padding:8px 4px;line-height:1.5}
 .auth .note a{color:inherit}
-input,textarea{font-size:max(16px,var(--t16))}
+/* Keep editable text at least 16px to avoid iPhone focus zoom. */
+input,textarea,.field input,.addrow input,input.inp,textarea.inp,input.cin{font-size:max(16px,var(--t16))}
+input.nick{font-size:max(16px,var(--t20))}
 </style>
 </head>
 <body>
@@ -846,7 +848,7 @@ function renderUser(){
     <button class="row" data-a="export"><span>백업 내보내기<br><small>JSON 파일로 저장해요</small></span>${ic('chev',18,2)}</button>
     <button class="row" data-a="import"><span>백업 불러오기<br><small>현재 데이터를 덮어써요</small></span>${ic('chev',18,2)}</button>
   </div>
-  <div class="ver">투두 개인용 · 로그인 없이 이 기기에만 저장해요</div>`;
+  <div class="ver">투두 개인용 v1.1 · 로그인 없이 이 기기에만 저장해요</div>`;
   void sc.offsetWidth;
   requestAnimationFrame(()=>{sc.classList.add('in');
     $$('[data-w]',sc).forEach(i=>i.style.width=i.dataset.w+'%');
