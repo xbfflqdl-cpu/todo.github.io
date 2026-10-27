@@ -17,15 +17,15 @@
   --ease:cubic-bezier(.2,.8,.2,1);--spring:cubic-bezier(.34,1.56,.64,1);--fs:.92;
   --bg:#F6F6F6;--card:#fff;--ink:#111;--inv:#fff;--sub:#6B6B6B;--line:#E0E0E0;--hair:#EAEAEA;
   --chip:#EBEBEB;--strong:#C8C8C8;--desk:#E4E4E6;--danger:#C62828;--shadow:0 20px 60px rgba(0,0,0,.18);
-  --tabh:calc(72px + env(safe-area-inset-bottom));
+  --tabh:calc(60px + env(safe-area-inset-bottom,0px));
   --t12:calc(12px*var(--fs));--t13:calc(13px*var(--fs));--t14:calc(14px*var(--fs));--t15:calc(15px*var(--fs));
   --t16:calc(16px*var(--fs));--t18:calc(18px*var(--fs));--t20:calc(20px*var(--fs));
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 [hidden]{display:none!important}
-html,body{margin:0;height:100%}
+html,body{margin:0;height:100%;background:var(--bg);color-scheme:light}
 body{font-family:'Pretendard Variable',Pretendard,-apple-system,BlinkMacSystemFont,'Apple SD Gothic Neo','Noto Sans KR',system-ui,sans-serif;
-  background:var(--desk);color:var(--ink);display:flex;align-items:center;justify-content:center;-webkit-font-smoothing:antialiased;overflow:hidden}
+  background:var(--bg);color:var(--ink);display:flex;align-items:center;justify-content:center;-webkit-font-smoothing:antialiased;overflow:hidden}
 button{font:inherit;color:inherit;border:0;background:none;padding:0;cursor:pointer;touch-action:manipulation}
 input,textarea{font:inherit;color:inherit}
 :focus-visible{outline:2px solid var(--ink);outline-offset:2px}
@@ -92,11 +92,11 @@ input,textarea{font:inherit;color:inherit}
 .view{position:absolute;inset:0 0 var(--tabh) 0;opacity:0;visibility:hidden;transform:translateX(24px);transition:opacity .3s var(--ease),transform .4s var(--ease),visibility 0s .4s}
 .view.left{transform:translateX(-24px)}
 .view.active{opacity:1;visibility:visible;transform:none;transition-delay:0s}
-.scroll{height:100%;overflow-y:auto;overscroll-behavior:contain;padding:max(44px,env(safe-area-inset-top)) 20px 16px;display:flex;flex-direction:column;scrollbar-width:none}
+.scroll{height:100%;overflow-y:auto;overscroll-behavior:contain;padding:calc(env(safe-area-inset-top,0px) + 12px) max(20px,env(safe-area-inset-right,0px)) 16px max(20px,env(safe-area-inset-left,0px));display:flex;flex-direction:column;scrollbar-width:none}
 .scroll::-webkit-scrollbar{display:none}
 .scroll>*{flex-shrink:0}
-.tabbar{position:absolute;left:0;right:0;bottom:0;height:var(--tabh);padding:8px 48px env(safe-area-inset-bottom);display:flex;align-items:flex-start;background:var(--card);border-radius:28px 28px 0 0;border-top:1px solid var(--hair);--t:0;z-index:10}
-.tabpill{position:absolute;top:12px;width:64px;height:36px;border-radius:999px;background:color-mix(in srgb,var(--ink) 9%,var(--card));left:calc(48px + (var(--t) + .5)*(100% - 96px)/2 - 32px);transition:left .5s var(--spring)}
+.tabbar{position:absolute;left:0;right:0;bottom:0;height:var(--tabh);padding:6px 48px env(safe-area-inset-bottom,0px);display:flex;align-items:flex-start;background:var(--bg);border-radius:0;border-top:0;--t:0;z-index:10}
+.tabpill{position:absolute;top:10px;width:64px;height:36px;border-radius:999px;background:color-mix(in srgb,var(--ink) 9%,var(--card));left:calc(48px + (var(--t) + .5)*(100% - 96px)/2 - 32px);transition:left .5s var(--spring)}
 .tab{position:relative;flex:1;height:48px;display:grid;place-items:center;color:var(--sub);transition:color .25s,transform .18s var(--ease)}
 .tab:active{transform:scale(.88)}
 .tab.on{color:var(--ink)}
@@ -848,7 +848,7 @@ function renderUser(){
     <button class="row" data-a="export"><span>백업 내보내기<br><small>JSON 파일로 저장해요</small></span>${ic('chev',18,2)}</button>
     <button class="row" data-a="import"><span>백업 불러오기<br><small>현재 데이터를 덮어써요</small></span>${ic('chev',18,2)}</button>
   </div>
-  <div class="ver">투두 개인용 v1.1 · 로그인 없이 이 기기에만 저장해요</div>`;
+  <div class="ver">투두 개인용 v1.2 · 로그인 없이 이 기기에만 저장해요</div>`;
   void sc.offsetWidth;
   requestAnimationFrame(()=>{sc.classList.add('in');
     $$('[data-w]',sc).forEach(i=>i.style.width=i.dataset.w+'%');
